@@ -19,14 +19,88 @@
 #include <fstream>
 #include <thread>
 #include <ThreadSafeDeque.h>
+#include <stdexcept>
+#include <filesystem>
+#include <Utilities.h>
 #ifdef EnableTests
-    #include<gtest/gtest.h>
+    #include<gtest/gtest.h> 
 #endif
 
-constexpr unsigned int SERVER_PORT = 10000;
+constexpr unsigned int SERVER_PORT = 40000;
 constexpr unsigned int  MAXLINE = 4096;
+constexpr size_t NR_OF_THREADS = 16;
+int i=3;
 using SA = struct sockaddr;
 TSDeque<int> tsDeque;
+
+std::size_t extractPathSize(const char* arg_req, std::size_t arg_startPos)
+{
+    std::size_t i = arg_startPos;
+    std::size_t sizeOfPath = 0;
+    while(arg_req[i] >= '0' && arg_req[i] <= '9')
+    {
+        sizeOfPath = (sizeOfPath*10) + (arg_req[i] - 48);
+        i++;
+    }
+
+    return sizeOfPath > 0 ? sizeOfPath : -1;
+}
+
+void createPath(char* arg_path)
+{
+    constexpr std::size_t MAX_PATH_LENGTH = 1024;
+    char finalPath[MAX_PATH_LENGTH];
+    char* ptr = strtok(arg_path, "/");
+    std::size_t counter = 0;
+    while(ptr != NULL)
+    {
+        snprintf(finalPath+counter, sizeof(ptr), "%c", ptr);
+        counter += sizeof(ptr);
+        std::cout << " counter = " << counter << std::endl;
+        ptr = strtok(NULL, "/");
+    }
+    std::cout << finalPath << std::endl;
+}
+
+void processRequest(char* arg_req, std::size_t length)
+{
+    constexpr std::size_t MAX_PATH_LENGTH = 1024;
+    std::size_t sizeOfPath = 0;
+    std::cout << arg_req << std::endl;
+    if(strncmp("GET", arg_req, 3) == 0)
+    {
+        std::cout << "It is a GET request and path size is " << sizeOfPath << std::endl;
+        std::size_t pathSize = extractPathSize(arg_req, 3);
+
+    }
+    else if(strncmp("PUT", arg_req, 3) == 0)
+    {
+        std::cout << "It is a PUT request " << std::endl;
+        std::size_t pathSize = extractPathSize(arg_req, 3);
+        char path[MAX_PATH_LENGTH];
+        strncpy(path, arg_req+5, pathSize);
+        std::ofstream outFile(path, std::ios::out | std::ios::binary);
+        outFile << "Hello world";
+        outFile.close();
+        std::cout << path << std::endl;
+    }
+    else if(strncmp("MKDIR", arg_req, 5) == 0)
+    {
+        std::cout << "It is a make dir request " << std::endl;
+        std::size_t pathSize = extractPathSize(arg_req, 5);
+        char path[MAX_PATH_LENGTH];
+        strncpy(path, arg_req+5+2, pathSize);
+        //std::filesystem::create_directory(path);
+        createPath(path);
+        std::cout << path << std::endl;
+    }
+    else
+        throw std::runtime_error("Undefined action request !");
+
+    
+    
+    
+}
 
 void HandleConnection()
 {
@@ -34,40 +108,49 @@ void HandleConnection()
     size_t bytes_read = 0;
     socklen_t addr_len;
     char buff[MAXLINE+1];
+    char bigDataBuffer[MAXLINE*16];
     int n = 0;
-
-    
-    std::cout << "Connection accepted" << std::endl;
 
     do
     {
         std::shared_ptr<int> connFd = tsDeque.pop();
         if(connFd != nullptr)
         {
+            //Reset data
             memset(recvline, 0 , MAXLINE);
             memset(buff, 0, MAXLINE);
+            memset(bigDataBuffer, 0 , MAXLINE*16);
             n = 0;
+
+            std::thread::id this_id = std::this_thread::get_id();
+            std::cout << "Thread " << this_id << " will process current request ! " << std::endl;
+            std::ofstream out("Request");
 
             do
             {                
                 std::cout << "reading from fd "<< *connFd << "..." << std::endl;
-                bytes_read = read(*connFd, recvline, MAXLINE-1);
-                
-                // out << recvline;
-                std::cout << "read result = " << n << std::endl;
-                if(recvline[bytes_read-1] == '\n')
+                bytes_read = read(*connFd, &bigDataBuffer[n], MAXLINE-1);
+                std::cout << "bytes_read = " << bytes_read << std::endl;
+                n = n + bytes_read;
+                std::cout << "Total number of bytes read so far = " << n << std::endl;
+                if(bigDataBuffer[n-1] == '\n')
                     break;
-                memset(recvline, 0 , MAXLINE);
-
             } while (bytes_read > 0);
-        
+
+            out << bigDataBuffer;
+            out.close();
 
         if (bytes_read < 0)
             throw std::runtime_error("Read error !");
+
+        processRequest(bigDataBuffer, n);
         snprintf((char*)buff, sizeof(buff), "HTTP/1.0 200 OK\r\n\r\nHello");   
         write(*connFd, (char*)buff, strlen((char*)buff));
         close(*connFd);
         }
+
+        
+
 
     } while(1);    
 }
@@ -83,13 +166,15 @@ int main(int ac, char** av)
         
         int listenfd, connfd, n;
         struct sockaddr_in serverAddr;
-        std::thread threads[10];
+        std::thread threads[NR_OF_THREADS];
         int thCounter = 0;
         
-        threads[0] = std::thread(HandleConnection);
-        threads[1] = std::thread(HandleConnection);
-        //threads[0] = std::thread(HandleConnection);
+        for(int i=0; i<NR_OF_THREADS; i++)
+        {
+            threads[i] = std::thread(HandleConnection);
+        }
 
+        
         if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)    
             throw std::runtime_error("Socket creation failed ");
 
@@ -104,14 +189,12 @@ int main(int ac, char** av)
         if((listen(listenfd,10)) < 0)
             throw std::runtime_error("Listen error ");
 
-        
-
         while(1)
         {
             struct sockaddr_in addr;
             socklen_t addr_len;
 
-            std::cout << "Waiting for a connection on port " << SERVER_PORT << std::endl;
+            // std::cout << "Waiting for a connection on port " << SERVER_PORT << std::endl;
             fflush(stdout);
 
             connfd = accept(listenfd, (SA*)&addr, &addr_len);

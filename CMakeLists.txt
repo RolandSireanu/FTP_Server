@@ -7,16 +7,16 @@ set(CMAKE_BUILD_TYPE Debug)
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++17")
 
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
 
-add_subdirectory(headers)
-add_subdirectory(sources)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread)
+
 
 if(EnableTests)
     message("========= GTests enabled ! ===========")
+    add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
     add_definitions(-DEnableTests)
+    add_subdirectory(headers)
+    add_subdirectory(sources)
     include(FetchContent)
     FetchContent_Declare(
     googletest
@@ -39,4 +39,22 @@ if(EnableTests)
     
     include(GoogleTest)
     gtest_discover_tests(${CMAKE_PROJECT_NAME})
+endif()
+
+if(EnableBenchmark)
+    
+    add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
+    add_subdirectory(headers)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE "./benchmarking/start_benchmark.cpp" "./sources/Utilities/Utilities.cpp")
+    target_link_directories(${CMAKE_PROJECT_NAME} PUBLIC /home/roland/work/benchmark/build/src)
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE benchmark_main benchmark)
+    target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC /home/roland/work/benchmark/build/include /home/roland/work/benchmark/include)
+    
+endif()
+
+if(NormalExecution)
+    add_executable(${CMAKE_PROJECT_NAME} ${SOURCES})
+    add_subdirectory(headers)
+    add_subdirectory(sources)
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread)
 endif()

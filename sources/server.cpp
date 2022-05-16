@@ -22,6 +22,9 @@
 #include <stdexcept>
 #include <filesystem>
 #include <Utilities.h>
+#include <CommandProcessor.h>
+#include <MkdirCommand.h>
+#include <PutCommand.h>
 #ifdef EnableTests
     #include<gtest/gtest.h> 
 #endif
@@ -33,34 +36,8 @@ int i=3;
 using SA = struct sockaddr;
 TSDeque<int> tsDeque;
 
-std::size_t extractPathSize(const char* arg_req, std::size_t arg_startPos)
-{
-    std::size_t i = arg_startPos;
-    std::size_t sizeOfPath = 0;
-    while(arg_req[i] >= '0' && arg_req[i] <= '9')
-    {
-        sizeOfPath = (sizeOfPath*10) + (arg_req[i] - 48);
-        i++;
-    }
 
-    return sizeOfPath > 0 ? sizeOfPath : -1;
-}
 
-void createPath(char* arg_path)
-{
-    constexpr std::size_t MAX_PATH_LENGTH = 1024;
-    char finalPath[MAX_PATH_LENGTH];
-    char* ptr = strtok(arg_path, "/");
-    std::size_t counter = 0;
-    while(ptr != NULL)
-    {
-        snprintf(finalPath+counter, sizeof(ptr), "%c", ptr);
-        counter += sizeof(ptr);
-        std::cout << " counter = " << counter << std::endl;
-        ptr = strtok(NULL, "/");
-    }
-    std::cout << finalPath << std::endl;
-}
 
 void processRequest(char* arg_req, std::size_t length)
 {
@@ -89,17 +66,11 @@ void processRequest(char* arg_req, std::size_t length)
         std::cout << "It is a make dir request " << std::endl;
         std::size_t pathSize = extractPathSize(arg_req, 5);
         char path[MAX_PATH_LENGTH];
-        strncpy(path, arg_req+5+2, pathSize);
-        //std::filesystem::create_directory(path);
-        createPath(path);
-        std::cout << path << std::endl;
+        strncpy(path, arg_req+5+2, pathSize);        
+        createPath(path, "/tmp");        
     }
     else
         throw std::runtime_error("Undefined action request !");
-
-    
-    
-    
 }
 
 void HandleConnection()
@@ -148,10 +119,6 @@ void HandleConnection()
         write(*connFd, (char*)buff, strlen((char*)buff));
         close(*connFd);
         }
-
-        
-
-
     } while(1);    
 }
 
@@ -164,6 +131,12 @@ int main(int ac, char** av)
         return RUN_ALL_TESTS();
     #else
         
+        MkdirHandler* mkdirHandler = new MkdirHandler{};
+        PutHandler* putHandler = new PutHandler{};
+
+        mkdirHandler->SetNext(putHandler);
+        mkdirHandler->Handle("Hello world !");
+
         int listenfd, connfd, n;
         struct sockaddr_in serverAddr;
         std::thread threads[NR_OF_THREADS];

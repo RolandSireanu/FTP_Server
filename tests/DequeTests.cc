@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <ThreadSafeDeque.h>
 #include <iostream>
+#include <random>
 
 // Demonstrate some basic assertions.
 TEST(BasicTests, TestingSizeFunction) {
@@ -38,5 +39,35 @@ TEST(BasicTests, EmptyQueueTest) {
 }
 
 
+class DequeTest : public ::testing::Test
+{
+    protected:
+        TSDeque<double> doubleDeque;
+        std::random_device rd;  // Will be used to obtain a seed for the random number engine
+        std::mt19937 gen;
+        std::uniform_real_distribution<> dist1;
+        static constexpr std::size_t DEQUE_SIZE = 128;
+        
+        DequeTest(): gen(rd()), dist1(0.0,1.0) 
+        {
+            for(int i=0; i<DEQUE_SIZE; i++)
+                doubleDeque.push(dist1(gen));
+        }
+};
+
+TEST_F(DequeTest, DoubleDequeTest)
+{
+    EXPECT_EQ(doubleDeque.size(), DEQUE_SIZE);
+    for(int i=0; i<DEQUE_SIZE; i++)
+        static_cast<void>(doubleDeque.pop());
+    EXPECT_EQ(doubleDeque.empty(), true);
+}
+
+TEST_F(DequeTest, DoubleDequeTestSize)
+{
+    for(int i=0; i<DEQUE_SIZE; i++)
+        doubleDeque.push(dist1(gen));
+    ASSERT_EQ(doubleDeque.size(), DEQUE_SIZE * 2);
+}
 
 

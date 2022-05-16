@@ -16,24 +16,19 @@ std::size_t extractPathSize(const char* arg_req, std::size_t arg_startPos)
 
 void createPath(char* arg_path, const char* arg_startingPath)
 {
-    constexpr std::size_t MAX_PATH_LENGTH = 1024;
-    char finalPath[MAX_PATH_LENGTH];
-    char* ptr = strtok(arg_path, "/");
-    std::size_t counter = 0;
-    
-    memset(finalPath, 0, MAX_PATH_LENGTH/4);
-    strcat(finalPath, arg_startingPath);
-    strcat(finalPath, "/");
+    std::string startingPath {arg_startingPath};
+    std::string finalPath {startingPath + "/" + std::string{arg_path}};
 
-    while(ptr != NULL)
+    std::size_t position = finalPath.find("//");    
+    while(position != std::string::npos)
     {
-        strcat(finalPath, ptr);
-        strcat(finalPath, "/");
-
-        if(std::filesystem::exists(finalPath) == false)
-        {
-            std::filesystem::create_directory(finalPath);    
-        }
-        ptr = strtok(NULL, "/");
+        finalPath.erase(position,1);
+        position = finalPath.find("//");
     }
+
+    if(std::filesystem::exists(finalPath) == false)
+    {
+        std::filesystem::create_directories(finalPath);    
+    }
+    
 }

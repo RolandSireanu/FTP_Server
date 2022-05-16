@@ -17,6 +17,7 @@ if(EnableTests)
     add_definitions(-DEnableTests)
     add_subdirectory(headers)
     add_subdirectory(sources)
+    add_subdirectory(tests)
     include(FetchContent)
     FetchContent_Declare(
     googletest
@@ -27,8 +28,6 @@ if(EnableTests)
     FetchContent_MakeAvailable(googletest)
 
     enable_testing()
-
-    target_sources(${CMAKE_PROJECT_NAME} PRIVATE "./tests/DequeTests.cc" "./tests/MultithreadingDequeTests.cc")
 
     target_link_libraries(
         ${CMAKE_PROJECT_NAME}
